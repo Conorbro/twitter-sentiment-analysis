@@ -1,0 +1,7 @@
+*.env
+*.service
+/bin
+twitter.yml
+twitter
+twitterbot-linux
+key.json
