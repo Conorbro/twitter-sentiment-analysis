@@ -1,0 +1,7 @@
+target_hashtag: "#target_hashtag"
+google_app_credentials_file: "path_to_google_app_credentials_file"
+twitter_credentials:
+  twitter_consumer_key: "you_consumer_key"
+  twitter_consumer_secret: "your_consumer_secret"
+  twitter_access_token: "your_access_token"
+  twitter_access_token_secret: "your_access_token_secret"
