@@ -1,0 +1,11 @@
+{{define "index"}}
+<html>
+<head>
+<title>Twitter Sentiment Analysis</title>
+</head>
+<body>
+  <h1>Average sentiment analysis: {{.SentimentScoreRollingAvg}}</h1>
+  <h1>Total Samples ingested: {{.DataPoints}}</h1>
+</body>
+</html>
+{{end}}
