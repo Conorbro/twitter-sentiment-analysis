@@ -68,7 +68,8 @@ func consumeStream() {
 		if t.RetweetedStatus != nil {
 			continue
 		}
-		cc.Total += getSentimentAnalysisScore(t.Text)
+		tweetText := cleanseTweet(t.Text)
+		cc.Total += getSentimentAnalysisScore(tweetText)
 		cc.DataPoints++
 		cc.SentimentScoreRollingAvg = cc.Total / float32(cc.DataPoints)
 		fmt.Println("Rolling average =", cc.SentimentScoreRollingAvg)
