@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -41,6 +42,12 @@ type CurrentConsensus struct {
 	Total                    float32
 }
 
+// Sample represents an individual tweet's sentiment analysis score and its corresponding timestamp.
+type Sample struct {
+	SentimentScore float32 `json:"sentiment_analysis_score"`
+	Timestamp      string  `json:"time_stamp"`
+}
+
 var cc CurrentConsensus
 
 func consumeStream() {
@@ -55,10 +62,18 @@ func consumeStream() {
 		"track": []string{sc.C.TargetHashtag},
 	})
 
+	f, err := os.Create("output.json")
+	if err != nil {
+		log.Errorf("Error creating output file: %v", err)
+	}
+
 	defer stream.Stop()
 
 	for v := range stream.C {
 		t, ok := v.(anaconda.Tweet)
+		if t.Lang != "en" {
+			continue
+		}
 		if !ok {
 			log.Warningf("Received unexpected value of type %T", v)
 			continue
@@ -69,11 +84,18 @@ func consumeStream() {
 			continue
 		}
 		tweetText := cleanseTweet(t.Text)
-		cc.Total += getSentimentAnalysisScore(tweetText)
+		sentimentAnalysisScore := getSentimentAnalysisScore(tweetText)
+		cc.Total += sentimentAnalysisScore
 		cc.DataPoints++
 		cc.SentimentScoreRollingAvg = cc.Total / float32(cc.DataPoints)
 		fmt.Println("Rolling average =", cc.SentimentScoreRollingAvg)
-		fmt.Println(getSentimentAnalysisScore(t.Text))
+		fmt.Println(sentimentAnalysisScore)
+		smpl := &Sample{SentimentScore: sentimentAnalysisScore, Timestamp: t.CreatedAt}
+		writeSmpl, err := json.Marshal(smpl)
+		if err != nil {
+			log.Errorf("Error converting sample to JSON: %v", err)
+		}
+		f.Write(writeSmpl)
 	}
 }
 
