@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
@@ -35,6 +36,11 @@ var (
 // 	return v
 // }
 
+// TwitterClient represents the Twitter client for making Twitter API calls.
+type TwitterClient struct {
+	api *anaconda.TwitterApi
+}
+
 // CurrentConsensus represents the current consensus Twitter has towards a certain #topic.
 type CurrentConsensus struct {
 	SentimentScoreRollingAvg float32
@@ -48,17 +54,24 @@ type Sample struct {
 	Timestamp      string  `json:"time_stamp"`
 }
 
-var cc CurrentConsensus
+var (
+	cc            CurrentConsensus
+	twitterClient *TwitterClient
+)
 
-func consumeStream() {
+// NewTwitterClient authenticates with Twitter api and returns Twitter Client obj.
+func NewTwitterClient() *TwitterClient {
 	anaconda.SetConsumerKey(sc.C.TwitterCredentials.TwitterConsumerKey)
 	anaconda.SetConsumerSecret(sc.C.TwitterCredentials.TwitterConsumerSecret)
 	api := anaconda.NewTwitterApi(sc.C.TwitterCredentials.TwitterAccessToken, sc.C.TwitterCredentials.TwitterAccessTokenSecret)
+	return &TwitterClient{api: api}
+}
 
+func (t *TwitterClient) consumeStream() {
 	log := &logger{logrus.New()}
-	api.SetLogger(log)
+	t.api.SetLogger(log)
 
-	stream := api.PublicStreamFilter(url.Values{
+	stream := t.api.PublicStreamFilter(url.Values{
 		"track": []string{sc.C.TargetHashtag},
 	})
 
@@ -68,17 +81,17 @@ func consumeStream() {
 	}
 
 	defer stream.Stop()
-
+	log.Info("Starting stream...")
 	for v := range stream.C {
+		log.Info("Getting tweet...")
 		t, ok := v.(anaconda.Tweet)
 		if t.Lang != "en" {
 			continue
 		}
 		if !ok {
-			log.Warningf("Received unexpected value of type %T", v)
+			log.Warningf("Received unexpected value of type %T, skipping...", v)
 			continue
 		}
-
 		// Ignore retweets
 		if t.RetweetedStatus != nil {
 			continue
@@ -88,14 +101,32 @@ func consumeStream() {
 		cc.Total += sentimentAnalysisScore
 		cc.DataPoints++
 		cc.SentimentScoreRollingAvg = cc.Total / float32(cc.DataPoints)
-		fmt.Println("Rolling average =", cc.SentimentScoreRollingAvg)
-		fmt.Println(sentimentAnalysisScore)
+		log.Infof("Rolling average = %v", cc.SentimentScoreRollingAvg)
 		smpl := &Sample{SentimentScore: sentimentAnalysisScore, Timestamp: t.CreatedAt}
 		writeSmpl, err := json.Marshal(smpl)
 		if err != nil {
 			log.Errorf("Error converting sample to JSON: %v", err)
 		}
-		f.Write(writeSmpl)
+		f.WriteString(string(writeSmpl) + "\n")
+	}
+}
+
+func postCurrentAverage() {
+	ticker := time.NewTicker(2 * time.Hour)
+	quit := make(chan struct{})
+	for {
+		select {
+		case <-ticker.C:
+			status := fmt.Sprintf("Current Average Sentiment Analysis for repealThe8th: %v for %v samples", cc.SentimentScoreRollingAvg, cc.DataPoints)
+			_, err := twitterClient.api.PostTweet(status, nil)
+			if err != nil {
+				log.Fatalf("Error posting Tweet: %v", err)
+			}
+			fmt.Println("Current Average Sentiment Analysis:", cc.SentimentScoreRollingAvg)
+		case <-quit:
+			ticker.Stop()
+			return
+		}
 	}
 }
 
@@ -107,7 +138,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	go consumeStream()
+	twitterClient = NewTwitterClient()
+
+	// Kick off goroutine to consume tweets from Twitter.
+	go twitterClient.consumeStream()
+	// Post the current average sentiment analysis to Twitter.
+	go postCurrentAverage()
 
 	tmpl := template.Must(template.ParseFiles("templates/index.html"))
 	mux := http.NewServeMux()

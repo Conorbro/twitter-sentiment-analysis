@@ -12,13 +12,11 @@ import (
 
 func getSentimentAnalysisScore(text string) float32 {
 	ctx := context.Background()
-
 	// Creates a client.
 	client, err := language.NewClient(ctx)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
-
 	// Detects the sentiment of the text.
 	sentiment, err := client.AnalyzeSentiment(ctx, &languagepb.AnalyzeSentimentRequest{
 		Document: &languagepb.Document{
@@ -35,9 +33,9 @@ func getSentimentAnalysisScore(text string) float32 {
 
 	fmt.Printf("Text: %v\n", text)
 	if sentiment.DocumentSentiment.Score >= 0 {
-		fmt.Printf("Sentiment: positive: %v\n", sentiment.DocumentSentiment.Score)
+		log.Printf("Sentiment: positive: %v\n", sentiment.DocumentSentiment.Score)
 	} else {
-		fmt.Printf("Sentiment: negative: %v\n", sentiment.DocumentSentiment.Score)
+		log.Printf("Sentiment: negative: %v\n", sentiment.DocumentSentiment.Score)
 	}
 	return sentiment.DocumentSentiment.Score
 }
