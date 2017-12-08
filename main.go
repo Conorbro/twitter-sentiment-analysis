@@ -52,6 +52,7 @@ type CurrentConsensus struct {
 type Sample struct {
 	SentimentScore float32 `json:"sentiment_analysis_score"`
 	Timestamp      string  `json:"time_stamp"`
+	Location       string  `json:"location"`
 }
 
 var (
@@ -101,11 +102,11 @@ func (t *TwitterClient) consumeStream() {
 		sentimentAnalysisScore := getSentimentAnalysisScore(tweetText)
 		cc.Total += sentimentAnalysisScore
 		cc.DataPoints++
-		log.Debugf("cc.Total = %v", cc.Total)
-		log.Debugf("cc.DataPoints = %v", float32(cc.DataPoints))
+		log.Infof("cc.Total = %v", cc.Total)
+		log.Infof("cc.DataPoints = %v", float32(cc.DataPoints))
 		cc.SentimentScoreRollingAvg = Round(cc.Total/float32(cc.DataPoints), 0.05)
 		log.Infof("Rolling average = %v", cc.SentimentScoreRollingAvg)
-		smpl := &Sample{SentimentScore: sentimentAnalysisScore, Timestamp: t.CreatedAt}
+		smpl := &Sample{SentimentScore: sentimentAnalysisScore, Location: t.Place.FullName, Timestamp: t.CreatedAt}
 		writeSmpl, err := json.Marshal(smpl)
 		if err != nil {
 			log.Errorf("Error converting sample to JSON: %v", err)
@@ -140,6 +141,7 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 		os.Exit(1)
 	}
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", sc.C.GoogleApplicationCredentialsFile)
 
 	twitterClient = NewTwitterClient()
 

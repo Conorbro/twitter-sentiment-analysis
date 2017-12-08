@@ -16,7 +16,7 @@ func cleanseTweet(tweet string) string {
 // Round rounds
 func Round(x, unit float32) float32 {
 	if x > 0 {
-		return float32(int32(x/(unit+0.5))) * unit
+		return float32(int32(x/unit+0.5)) * unit
 	}
 	return float32(int32(x/unit-0.5)) * unit
 }
