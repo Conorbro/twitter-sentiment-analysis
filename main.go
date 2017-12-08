@@ -86,6 +86,7 @@ func (t *TwitterClient) consumeStream() {
 		log.Info("Getting tweet...")
 		t, ok := v.(anaconda.Tweet)
 		if t.Lang != "en" {
+			log.Debug("Tweet not English language, skipping...")
 			continue
 		}
 		if !ok {
@@ -100,7 +101,9 @@ func (t *TwitterClient) consumeStream() {
 		sentimentAnalysisScore := getSentimentAnalysisScore(tweetText)
 		cc.Total += sentimentAnalysisScore
 		cc.DataPoints++
-		cc.SentimentScoreRollingAvg = cc.Total / float32(cc.DataPoints)
+		log.Debugf("cc.Total = %v", cc.Total)
+		log.Debugf("cc.DataPoints = %v", float32(cc.DataPoints))
+		cc.SentimentScoreRollingAvg = Round(cc.Total/float32(cc.DataPoints), 0.05)
 		log.Infof("Rolling average = %v", cc.SentimentScoreRollingAvg)
 		smpl := &Sample{SentimentScore: sentimentAnalysisScore, Timestamp: t.CreatedAt}
 		writeSmpl, err := json.Marshal(smpl)
@@ -111,18 +114,18 @@ func (t *TwitterClient) consumeStream() {
 	}
 }
 
-func postCurrentAverage() {
+func postToTwitter() {
 	ticker := time.NewTicker(2 * time.Hour)
 	quit := make(chan struct{})
 	for {
 		select {
 		case <-ticker.C:
-			status := fmt.Sprintf("Current Average Sentiment Analysis for repealThe8th: %v for %v samples", cc.SentimentScoreRollingAvg, cc.DataPoints)
+			status := fmt.Sprintf("Current Average Sentiment Analysis for %v: %v for %v samples", sc.C.TargetHashtag, cc.SentimentScoreRollingAvg, cc.DataPoints)
 			_, err := twitterClient.api.PostTweet(status, nil)
 			if err != nil {
 				log.Fatalf("Error posting Tweet: %v", err)
 			}
-			fmt.Println("Current Average Sentiment Analysis:", cc.SentimentScoreRollingAvg)
+			log.Println("Current Average Sentiment Analysis:", cc.SentimentScoreRollingAvg)
 		case <-quit:
 			ticker.Stop()
 			return
@@ -143,7 +146,7 @@ func main() {
 	// Kick off goroutine to consume tweets from Twitter.
 	go twitterClient.consumeStream()
 	// Post the current average sentiment analysis to Twitter.
-	go postCurrentAverage()
+	go postToTwitter()
 
 	tmpl := template.Must(template.ParseFiles("templates/index.html"))
 	mux := http.NewServeMux()
@@ -151,18 +154,6 @@ func main() {
 		tmpl.ExecuteTemplate(w, "index", cc)
 	})
 	mux.Handle("/templates/", http.StripPrefix("/templates/", http.FileServer(http.Dir("templates"))))
-
-	// http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-	// 	page := fmt.Sprintf(`<html>
-	// 				<head>
-	// 				<title>Twitter Sentiment Analysis</title>
-	// 				</head>
-	// 				<body>
-	// 				<h1>%s</h1>
-	// 				</body>
-	// 				</html>`, sc.C.TargetHashtag)
-	// 	w.Write([]byte(page))
-	// })
 
 	if err := http.ListenAndServe(*listenAddress, mux); err != nil {
 		log.Fatalf("Error starting HTTP server: %v", err)
