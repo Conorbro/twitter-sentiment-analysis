@@ -104,7 +104,7 @@ func (t *TwitterClient) consumeStream() {
 		cc.DataPoints++
 		log.Infof("cc.Total = %v", cc.Total)
 		log.Infof("cc.DataPoints = %v", float32(cc.DataPoints))
-		cc.SentimentScoreRollingAvg = Round(cc.Total/float32(cc.DataPoints), 0.05)
+		cc.SentimentScoreRollingAvg = Round(cc.Total/float32(cc.DataPoints), 0.00005)
 		log.Infof("Rolling average = %v", cc.SentimentScoreRollingAvg)
 		smpl := &Sample{SentimentScore: sentimentAnalysisScore, Location: t.Place.FullName, Timestamp: t.CreatedAt}
 		writeSmpl, err := json.Marshal(smpl)
